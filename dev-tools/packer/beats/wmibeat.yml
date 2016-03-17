@@ -1,0 +1,4 @@
+beat_name: wmibeat
+beat_url: 'https://github.com/eskibars'
+beat_repo: 'github.com/eskibars'
+beat_description: Sends wmibeat metrics to Logstash or directly to Elasticsearch.
