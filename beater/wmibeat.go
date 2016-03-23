@@ -69,27 +69,27 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 		case <-ticker.C:
 		}
 		
+		ole.CoInitialize(0)
+		wmiscriptObj, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
+		if err != nil {
+			return err
+		}
+		wmiqi, err := wmiscriptObj.QueryInterface(ole.IID_IDispatch)
+		if err != nil {
+			return err
+		}
+		defer wmiscriptObj.Release()
+		serviceObj, err := oleutil.CallMethod(wmiqi, "ConnectServer")
+		if err != nil {
+			return err
+		}
+		defer wmiqi.Release()
+		service := serviceObj.ToIDispatch()
+		defer serviceObj.Clear()
+		
 		var allValues []common.MapStr
 		for _, class := range bt.beatConfig.Wmibeat.Classes {
 			if len(class.Fields) > 0 {
-				ole.CoInitialize(0)
-				wmiscriptObj, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
-				if err != nil {
-					return err
-				}
-				wmiqi, err := wmiscriptObj.QueryInterface(ole.IID_IDispatch)
-				if err != nil {
-					return err
-				}
-				defer wmiscriptObj.Release()
-				serviceObj, err := oleutil.CallMethod(wmiqi, "ConnectServer")
-				if err != nil {
-					return err
-				}
-				defer wmiqi.Release()
-				service := serviceObj.ToIDispatch()
-				defer serviceObj.Clear()
-				
 				var query bytes.Buffer
 				wmiFields := class.Fields
 				query.WriteString("SELECT ")
@@ -140,7 +140,6 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 					rowValues = nil
 				}
 				allValues = append(allValues, classValues...)
-				ole.CoUninitialize()
 				classValues = nil
 				
 			} else {
@@ -151,6 +150,7 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 				logp.Warn(errorString.String())
 			}
 		}
+		ole.CoUninitialize()
 
 		event := common.MapStr{
 			"@timestamp": common.Time(time.Now()),
