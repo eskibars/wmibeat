@@ -122,7 +122,7 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 					}
 					row := rowObj.ToIDispatch()
 					defer rowObj.Clear()
-					var rowValues []common.MapStr
+					var rowValues common.MapStr
 					for _, j := range wmiFields {
 						wmiObj, err := oleutil.GetProperty(row, j)
 						
@@ -131,12 +131,12 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 						}
 						switch wmiObj.Value().(type) {
 							case string:
-								rowValues = append(rowValues, common.MapStr { j: wmiObj.ToString() } )
+								rowValues = common.MapStrUnion(rowValues, common.MapStr { j: wmiObj.ToString() } )
 						}
 						defer wmiObj.Clear()
 						
 					}
-					classValues = append(classValues, rowValues...)
+					classValues = append(classValues, rowValues)
 					rowValues = nil
 				}
 				allValues = append(allValues, classValues...)

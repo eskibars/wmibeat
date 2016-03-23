@@ -7,10 +7,17 @@ wmibeat:
   period: 1s
   
   classes:
-    - class: Win32_Process
+    - class: Win32_OperatingSystem
       fields:
-      - Description
-      whereclause: HandleCount > 10
+      - FreePhysicalMemory
+      - FreeSpaceInPagingFiles
+      - FreeVirtualMemory
+      - NumberOfProcesses
+      - NumberOfUsers
+    - class: Win32_LogicalDisk
+      fields: 
+      - Caption
+      - FreeSpace
 
 ###############################################################################
 ############################# Libbeat Config ##################################
