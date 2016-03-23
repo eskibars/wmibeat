@@ -129,10 +129,7 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 						if err != nil {
 							return err
 						}
-						switch wmiObj.Value().(type) {
-							case string:
-								rowValues = common.MapStrUnion(rowValues, common.MapStr { j: wmiObj.ToString() } )
-						}
+						rowValues = common.MapStrUnion(rowValues, common.MapStr { j: wmiObj.Value() } )
 						defer wmiObj.Clear()
 						
 					}
