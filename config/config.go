@@ -3,15 +3,17 @@
 
 package config
 
-import (
-	"github.com/urso/ucfg"
-)
-
 type Config struct {
 	Wmibeat WmibeatConfig
 }
 
 type WmibeatConfig struct {
-	Period string `yaml:"period"`
-	WMIQueries []*ucfg.Config
+	Period   string `yaml:"period"`
+	Classes  []ClassConfig
+}
+
+type ClassConfig struct {
+	Class       string    `config:"class"`
+	Fields      []string  `config:"fields"`
+	WhereClause string    `config:"whereclause"`
 }
