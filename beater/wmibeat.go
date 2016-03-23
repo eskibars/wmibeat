@@ -139,7 +139,7 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 					classValues = append(classValues, rowValues)
 					rowValues = nil
 				}
-				allValues = append(allValues, classValues...)
+				allValues = append(allValues, common.MapStr { class.Class: classValues })
 				classValues = nil
 				
 			} else {
