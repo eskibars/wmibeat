@@ -1,7 +1,34 @@
-################### Wmibeat Configuration Example #########################
+################### WMIbeat Configuration Example #########################
 
-############################# Wmibeat ######################################
+############################# WMIbeat ######################################
 
 wmibeat:
   # Defines how often an event is sent to the output
-  period: 1s
+  period: 30s
+
+  classes:
+    - class: Win32_OperatingSystem
+      fields:
+      - FreePhysicalMemory
+      - FreeSpaceInPagingFiles
+      - FreeVirtualMemory
+      - NumberOfProcesses
+      - NumberOfUsers
+    - class: Win32_PerfFormattedData_PerfDisk_LogicalDisk
+      fields:
+      - Name
+      - FreeMegabytes
+      - PercentFreeSpace
+      - CurrentDiskQueueLength
+      - DiskReadsPerSec
+      - DiskWritesPerSec
+      - DiskBytesPerSec
+      - PercentDiskReadTime
+      - PercentDiskWriteTime
+      - PercentDiskTime
+      whereclause: Name != "_Total"
+    - class: Win32_PerfFormattedData_PerfOS_Memory
+      fields:
+      - CommittedBytes
+      - AvailableBytes
+      - PercentCommittedBytesInUse

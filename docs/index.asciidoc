@@ -1,5 +1,5 @@
-= Wmibeat Docs
+= WMIbeat Docs
 
-Welcome to the Wmibeat documentation.
+Welcome to the WMIbeat documentation.
 
-
+At the moment, all of the interesting documentation is still contained on the https://github.com/eskibars/wmibeat/blob/master/README.md[Readme]

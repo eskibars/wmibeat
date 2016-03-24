@@ -1,115 +1,57 @@
-# Wmibeat
+# WMIbeat
 
-Welcome to Wmibeat.
+Welcome to WMIbeat.  WMIbeat is a [beat](https://github.com/elastic/beats) that allows you to run arbitrary WMI queries
+and index the results into [elasticsearch](https://github.com/elastic/elasticsearch) so you can monitor Windows machines.
 
 Ensure that this folder is at the following location:
 `${GOPATH}/github.com/eskibars`
 
-## Getting Started with Wmibeat
+## Getting Started with WMIbeat
+To get running with WMIbeat, run "go build" and then run wmibeat.exe, as in the below `run` section.
+If you don't want to build your own, hop over to the "releases" page to download the latest.
 
-### Init Project
-To get running with Wmibeat, run the following commands:
+### Configuring
+To configure the WMI queries to run, you need to change wmibeat.yml.  Working from the default example:
 
-```
-make init
-```
+    classes:
+    - class: Win32_OperatingSystem
+      fields:
+      - FreePhysicalMemory
+      - FreeSpaceInPagingFiles
+      - FreeVirtualMemory
+      - NumberOfProcesses
+      - NumberOfUsers
+    - class: Win32_PerfFormattedData_PerfDisk_LogicalDisk
+      fields:
+      - Name
+      - FreeMegabytes
+      - PercentFreeSpace
+      - CurrentDiskQueueLength
+      - DiskReadsPerSec
+      - DiskWritesPerSec
+      - DiskBytesPerSec
+      - PercentDiskReadTime
+      - PercentDiskWriteTime
+      - PercentDiskTime
+      whereclause: Name != "_Total"
+    - class: Win32_PerfFormattedData_PerfOS_Memory
+      fields:
+      - CommittedBytes
+      - AvailableBytes
+      - PercentCommittedBytesInUse
 
-
-To push Wmibeat in the git repository, run the following commands:
-
-```
-git commit 
-git remote set-url origin https://github.com/eskibars/wmibeat
-git push origin master
-```
-
-For further development, check out the [beat developer guide](https://www.elastic.co/guide/en/beats/libbeat/current/new-beat.html).
-
-### Build
-
-To build the binary for Wmibeat run the command below. This will generate a binary
-in the same directory with the name wmibeat.
-
-```
-make
-```
-
-
+We can configure a set of classes, a set of fields per class, and a whereclause.  If there are multiple results, for any WMI class,
+WMIbeat will add the results as arrays.  If you need some help with what classes/fields, you can try [WMI Explorer](https://wmie.codeplex.com/).
+Note that many of the more interesting classes are "Perf" classes, which has a special checkbox to see in that tool.
+	  
 ### Run
 
-To run Wmibeat with debugging output enabled, run:
+To run WMIbeat with debugging output enabled, run:
 
 ```
 ./wmibeat -c wmibeat.yml -e -d "*"
 ```
 
-
-### Test
-
-To test Wmibeat, run the following commands:
-
-```
-make testsuite
-```
-
-alternatively:
-```
-make unit-tests
-make system-tests
-make integration-tests
-make coverage-report
-```
-
-The test coverage is reported in the folder `./build/coverage/`
-
-
-### Package
-
-To cross-compile and package Wmibeat for all supported platforms, run the following commands:
-
-```
-cd dev-tools/packer
-make deps
-make images
-make
-```
-
-### Update
-
-Each beat has a template for the mapping in elasticsearch and a documentation for the fields
-which is automatically generated based on `etc/fields.yml`.
-To generate etc/wmibeat.template.json and etc/wmibeat.asciidoc
-
-```
-make update
-```
-
-
-### Cleanup
-
-To clean  Wmibeat source code, run the following commands:
-
-```
-make fmt
-make simplify
-```
-
-To clean up the build directory and generated artifacts, run:
-
-```
-make clean
-```
-
-
-### Clone
-
-To clone Wmibeat from the git repository, run the following commands:
-
-```
-mkdir -p ${GOPATH}/github.com/eskibars
-cd ${GOPATH}/github.com/eskibars
-git clone https://github.com/eskibars/wmibeat
-```
-
-
+## Build your own Beat
+Beats is open source and has a convenient Beat generator, from which this project is based.
 For further development, check out the [beat developer guide](https://www.elastic.co/guide/en/beats/libbeat/current/new-beat.html).
