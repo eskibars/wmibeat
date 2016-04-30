@@ -88,7 +88,7 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 		service := serviceObj.ToIDispatch()
 		defer serviceObj.Clear()
 		
-		var allValues []common.MapStr
+		var allValues common.MapStr
 		for _, class := range bt.beatConfig.Wmibeat.Classes {
 			if len(class.Fields) > 0 {
 				var query bytes.Buffer
@@ -156,7 +156,7 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 					}
 					rowValues = nil
 				}
-				allValues = append(allValues, common.MapStr { class.Class: classValues })
+				allValues = common.MapStrUnion(allValues, common.MapStr { class.Class: classValues })
 				classValues = nil
 				
 			} else {
