@@ -34,6 +34,7 @@ To configure the WMI queries to run, you need to change wmibeat.yml.  Working fr
       - PercentDiskWriteTime
       - PercentDiskTime
       whereclause: Name != "_Total"
+	  objecttitlecolumn: Name
     - class: Win32_PerfFormattedData_PerfOS_Memory
       fields:
       - CommittedBytes
