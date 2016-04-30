@@ -5,6 +5,7 @@ import (
 	"time"
 	"strings"
 	"bytes"
+	"strconv"
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/cfgfile"
@@ -114,7 +115,13 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 				count := int(countObj.Val)
 				defer countObj.Clear()
 				
-				var classValues []common.MapStr
+				var classValues interface {} = nil
+				
+				if (class.ObjectTitle != "") {
+					classValues = common.MapStr{}
+				} else {
+					classValues = []common.MapStr{}
+				}
 				for i :=0; i < count; i++ {
 					rowObj, err := oleutil.CallMethod(result, "ItemIndex", i)
 					if err != nil {
@@ -123,17 +130,30 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 					row := rowObj.ToIDispatch()
 					defer rowObj.Clear()
 					var rowValues common.MapStr
+					var objectTitle = ""
 					for _, j := range wmiFields {
 						wmiObj, err := oleutil.GetProperty(row, j)
 						
 						if err != nil {
 							return err
 						}
-						rowValues = common.MapStrUnion(rowValues, common.MapStr { j: wmiObj.Value() } )
+						var objValue = wmiObj.Value()
+						if (class.ObjectTitle == j) {
+							objectTitle = objValue.(string)
+						}
+						rowValues = common.MapStrUnion(rowValues, common.MapStr { j: objValue } )
 						defer wmiObj.Clear()
 						
 					}
-					classValues = append(classValues, rowValues)
+					if (class.ObjectTitle != "") {
+						if (objectTitle != "") {
+							classValues =  common.MapStrUnion(classValues.(common.MapStr), common.MapStr { objectTitle: rowValues })
+						} else {
+							classValues =  common.MapStrUnion(classValues.(common.MapStr), common.MapStr { strconv.Itoa(i): rowValues })
+						}
+					} else {
+						classValues = append(classValues.([]common.MapStr), rowValues)
+					}
 					rowValues = nil
 				}
 				allValues = append(allValues, common.MapStr { class.Class: classValues })

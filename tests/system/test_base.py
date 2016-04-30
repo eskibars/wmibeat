@@ -7,7 +7,7 @@ class Test(BaseTest):
 
     def test_base(self):
         """
-        Basic test with exiting Wmibeat normally
+        Basic test with exiting WMIbeat normally
         """
         self.render_config_template(
                 path=os.path.abspath(self.working_dir) + "/log/*"

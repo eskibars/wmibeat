@@ -56,5 +56,5 @@ wmibeat:
 
 sections:
   - ["env", "Common"]
-  - ["wmibeat", "Wmibeat"]
+  - ["wmibeat", "WMIbeat"]
 

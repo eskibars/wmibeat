@@ -27,6 +27,7 @@ wmibeat:
       - PercentDiskWriteTime
       - PercentDiskTime
       whereclause: Name != "_Total"
+      objecttitlecolumn: Name
     - class: Win32_PerfFormattedData_PerfOS_Memory
       fields:
       - CommittedBytes
