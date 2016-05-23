@@ -60,123 +60,155 @@ func (bt *Wmibeat) Setup(b *beat.Beat) error {
 }
 
 func (bt *Wmibeat) Run(b *beat.Beat) error {
+	var err error
+
 	logp.Info("wmibeat is running! Hit CTRL-C to stop it.")
 	
 	ticker := time.NewTicker(bt.period)	
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-bt.done:
 			return nil
 		case <-ticker.C:
 		}
-		
-		ole.CoInitialize(0)
-		wmiscriptObj, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
+
+		err := bt.RunOnce(b)
 		if err != nil {
-			return err
+			logp.Err("Unable to run WMI queries: %v", err)
+			break
 		}
-		wmiqi, err := wmiscriptObj.QueryInterface(ole.IID_IDispatch)
-		if err != nil {
-			return err
-		}
-		defer wmiscriptObj.Release()
-		serviceObj, err := oleutil.CallMethod(wmiqi, "ConnectServer")
-		if err != nil {
-			return err
-		}
-		defer wmiqi.Release()
-		service := serviceObj.ToIDispatch()
-		defer serviceObj.Clear()
-		
-		var allValues common.MapStr
-		for _, class := range bt.beatConfig.Wmibeat.Classes {
-			if len(class.Fields) > 0 {
-				var query bytes.Buffer
-				wmiFields := class.Fields
-				query.WriteString("SELECT ")
-				query.WriteString(strings.Join(wmiFields, ","))
-				query.WriteString(" FROM ")
-				query.WriteString(class.Class)
-				if class.WhereClause != "" {
-					query.WriteString(" WHERE ")
-					query.WriteString(class.WhereClause)
-				}
-				logp.Info("Query: " + query.String())
-				resultObj, err := oleutil.CallMethod(service, "ExecQuery", query.String())
+	}
+
+	return err
+}
+
+func (bt *Wmibeat) RunOnce(b *beat.Beat) error {
+	ole.CoInitializeEx(0, 0)
+	defer ole.CoUninitialize()
+
+	wmiscriptObj, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
+	if err != nil {
+		logp.Err("Unable to create object: %v", err)
+		return err
+	}
+	defer wmiscriptObj.Release()
+
+	wmiqi, err := wmiscriptObj.QueryInterface(ole.IID_IDispatch)
+	if err != nil {
+		logp.Err("Unable to get locator query interface: %v", err)
+		return err
+	}
+	defer wmiqi.Release()
+
+	serviceObj, err := oleutil.CallMethod(wmiqi, "ConnectServer")
+	if err != nil {
+		logp.Err("Unable to connect to server: %v", err)
+		return err
+	}
+	defer serviceObj.Clear()
+
+	service := serviceObj.ToIDispatch()
+
+	var allValues common.MapStr
+	for _, class := range bt.beatConfig.Wmibeat.Classes {
+		if len(class.Fields) > 0 {
+			var query bytes.Buffer
+			wmiFields := class.Fields
+			query.WriteString("SELECT ")
+			query.WriteString(strings.Join(wmiFields, ","))
+			query.WriteString(" FROM ")
+			query.WriteString(class.Class)
+			if class.WhereClause != "" {
+				query.WriteString(" WHERE ")
+				query.WriteString(class.WhereClause)
+			}
+			logp.Info("Query: " + query.String())
+
+			resultObj, err := oleutil.CallMethod(service, "ExecQuery", query.String(), "WQL")
+			if err != nil {
+				logp.Err("Unable to execute query: %v", err)
+				return err
+			}
+			defer resultObj.Clear()
+
+			result := resultObj.ToIDispatch()
+			countObj, err := oleutil.GetProperty(result, "Count")
+			if err != nil {
+				logp.Err("Unable to get result count: %v", err)
+				return err
+			}
+			defer countObj.Clear()
+
+			count := int(countObj.Val)
+
+			var classValues interface {} = nil
+			
+			if (class.ObjectTitle != "") {
+				classValues = common.MapStr{}
+			} else {
+				classValues = []common.MapStr{}
+			}
+			for i :=0; i < count; i++ {
+				rowObj, err := oleutil.CallMethod(result, "ItemIndex", i)
 				if err != nil {
+					logp.Err("Unable to get result item by index: %v", err)
 					return err
 				}
-				result := resultObj.ToIDispatch()
-				defer resultObj.Clear()
-				countObj, err := oleutil.GetProperty(result, "Count")
-				if err != nil {
-					return err
-				}
-				count := int(countObj.Val)
-				defer countObj.Clear()
-				
-				var classValues interface {} = nil
-				
-				if (class.ObjectTitle != "") {
-					classValues = common.MapStr{}
-				} else {
-					classValues = []common.MapStr{}
-				}
-				for i :=0; i < count; i++ {
-					rowObj, err := oleutil.CallMethod(result, "ItemIndex", i)
+				defer rowObj.Clear()
+
+				row := rowObj.ToIDispatch()
+				var rowValues common.MapStr
+				var objectTitle = ""
+				for _, j := range wmiFields {
+					wmiObj, err := oleutil.GetProperty(row, j)
 					if err != nil {
+						logp.Err("Unable to get propery by name: %v", err)
 						return err
 					}
-					row := rowObj.ToIDispatch()
-					defer rowObj.Clear()
-					var rowValues common.MapStr
-					var objectTitle = ""
-					for _, j := range wmiFields {
-						wmiObj, err := oleutil.GetProperty(row, j)
-						
-						if err != nil {
-							return err
-						}
-						var objValue = wmiObj.Value()
-						if (class.ObjectTitle == j) {
-							objectTitle = objValue.(string)
-						}
-						rowValues = common.MapStrUnion(rowValues, common.MapStr { j: objValue } )
-						defer wmiObj.Clear()
-						
-					}
-					if (class.ObjectTitle != "") {
-						if (objectTitle != "") {
-							classValues =  common.MapStrUnion(classValues.(common.MapStr), common.MapStr { objectTitle: rowValues })
-						} else {
-							classValues =  common.MapStrUnion(classValues.(common.MapStr), common.MapStr { strconv.Itoa(i): rowValues })
-						}
-					} else {
-						classValues = append(classValues.([]common.MapStr), rowValues)
-					}
-					rowValues = nil
-				}
-				allValues = common.MapStrUnion(allValues, common.MapStr { class.Class: classValues })
-				classValues = nil
-				
-			} else {
-				var errorString bytes.Buffer
-				errorString.WriteString("No fields defined for class ")
-				errorString.WriteString(class.Class)
-				errorString.WriteString(".  Skipping")
-				logp.Warn(errorString.String())
-			}
-		}
-		ole.CoUninitialize()
+					defer wmiObj.Clear()
 
-		event := common.MapStr{
-			"@timestamp": common.Time(time.Now()),
-			"type":       b.Name,
-			"wmi":    allValues,
+					var objValue = wmiObj.Value()
+					if (class.ObjectTitle == j) {
+						objectTitle = objValue.(string)
+					}
+					rowValues = common.MapStrUnion(rowValues, common.MapStr { j: objValue } )
+					
+				}
+				if (class.ObjectTitle != "") {
+					if (objectTitle != "") {
+						classValues =  common.MapStrUnion(classValues.(common.MapStr), common.MapStr { objectTitle: rowValues })
+					} else {
+						classValues =  common.MapStrUnion(classValues.(common.MapStr), common.MapStr { strconv.Itoa(i): rowValues })
+					}
+				} else {
+					classValues = append(classValues.([]common.MapStr), rowValues)
+				}
+				rowValues = nil
+			}
+			allValues = common.MapStrUnion(allValues, common.MapStr { class.Class: classValues })
+			classValues = nil
+			
+		} else {
+			var errorString bytes.Buffer
+			errorString.WriteString("No fields defined for class ")
+			errorString.WriteString(class.Class)
+			errorString.WriteString(".  Skipping")
+			logp.Warn(errorString.String())
 		}
-		b.Events.PublishEvent(event)
-		logp.Info("Event sent")
 	}
+
+	event := common.MapStr{
+		"@timestamp": common.Time(time.Now()),
+		"type":       b.Name,
+		"wmi":    allValues,
+	}
+
+	b.Events.PublishEvent(event)
+	logp.Info("Event sent")
+
+	return err
 }
 
 func (bt *Wmibeat) Cleanup(b *beat.Beat) error {
