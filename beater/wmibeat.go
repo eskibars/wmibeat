@@ -18,6 +18,7 @@ import (
 
 type Wmibeat struct {
 	beatConfig   *config.Config
+	compiledWmiQueries   map[string]string
 	done         chan struct{}
 	period       time.Duration
 }
@@ -53,6 +54,28 @@ func (bt *Wmibeat) Setup(b *beat.Beat) error {
 	bt.period, err = time.ParseDuration(bt.beatConfig.Wmibeat.Period)
 	if err != nil {
 		return err
+	}
+
+	bt.compiledWmiQueries = map[string]string{}
+	for _, class := range bt.beatConfig.Wmibeat.Classes {
+		if len(class.Fields) == 0 {
+			var errorString bytes.Buffer
+			errorString.WriteString("No fields defined for class ")
+			errorString.WriteString(class.Class)
+			errorString.WriteString(".  Skipping")
+			logp.Warn(errorString.String())
+			continue
+		}
+		var query bytes.Buffer
+		query.WriteString("SELECT ")
+		query.WriteString(strings.Join(class.Fields, ","))
+		query.WriteString(" FROM ")
+		query.WriteString(class.Class)
+		if class.WhereClause != "" {
+			query.WriteString(" WHERE ")
+			query.WriteString(class.WhereClause)
+		}
+		bt.compiledWmiQueries[class.Class] = query.String()
 	}
 
 	return nil
@@ -111,28 +134,14 @@ func (bt *Wmibeat) RunOnce(b *beat.Beat) error {
 	service := serviceObj.ToIDispatch()
 
 	for _, class := range bt.beatConfig.Wmibeat.Classes {
-		if len(class.Fields) == 0 {
-			var errorString bytes.Buffer
-			errorString.WriteString("No fields defined for class ")
-			errorString.WriteString(class.Class)
-			errorString.WriteString(".  Skipping")
-			logp.Warn(errorString.String())
+		query, exists := bt.compiledWmiQueries[class.Class]
+		if !exists { 
 			continue
 		}
 
-		var query bytes.Buffer
-		wmiFields := class.Fields
-		query.WriteString("SELECT ")
-		query.WriteString(strings.Join(wmiFields, ","))
-		query.WriteString(" FROM ")
-		query.WriteString(class.Class)
-		if class.WhereClause != "" {
-			query.WriteString(" WHERE ")
-			query.WriteString(class.WhereClause)
-		}
-		logp.Info("Query: " + query.String())
+		logp.Info("Query: " + query)
 
-		resultObj, err := oleutil.CallMethod(service, "ExecQuery", query.String(), "WQL")
+		resultObj, err := oleutil.CallMethod(service, "ExecQuery", query, "WQL")
 		if err != nil {
 			logp.Err("Unable to execute query: %v", err)
 			return err
@@ -165,7 +174,7 @@ func (bt *Wmibeat) RunOnce(b *beat.Beat) error {
 				"class":    class.Class,
 			}
 
-			for _, fieldName := range wmiFields {
+			for _, fieldName := range class.Fields {
 				wmiObj, err := oleutil.GetProperty(row, fieldName)
 				if err != nil {
 					logp.Err("Unable to get propery by name: %v", err)
