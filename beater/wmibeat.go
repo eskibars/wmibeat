@@ -10,6 +10,7 @@ import (
 	"github.com/elastic/beats/libbeat/cfgfile"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/publisher"
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
@@ -17,10 +18,11 @@ import (
 )
 
 type Wmibeat struct {
-	beatConfig   *config.Config
+	beatConfig           *config.Config
+	events               publisher.Client
 	compiledWmiQueries   map[string]string
-	done         chan struct{}
-	period       time.Duration
+	done                 chan struct{}
+	period               time.Duration
 }
 
 // Creates beater
@@ -44,6 +46,7 @@ func (bt *Wmibeat) Config(b *beat.Beat) error {
 }
 
 func (bt *Wmibeat) Setup(b *beat.Beat) error {
+	bt.events = b.Publisher.Connect()
 
 	// Setting default period if not set
 	if bt.beatConfig.Wmibeat.Period == "" {
@@ -133,6 +136,8 @@ func (bt *Wmibeat) RunOnce(b *beat.Beat) error {
 
 	service := serviceObj.ToIDispatch()
 
+	events := []common.MapStr{}
+
 	for _, class := range bt.beatConfig.Wmibeat.Classes {
 		query, exists := bt.compiledWmiQueries[class.Class]
 		if !exists { 
@@ -186,9 +191,11 @@ func (bt *Wmibeat) RunOnce(b *beat.Beat) error {
 				event[fieldName] = objValue
 			}
 
-			b.Events.PublishEvent(event)
+			events = append(events, event)
 		}
 	}
+
+	bt.events.PublishEvents(events)
 
 	return err
 }
@@ -199,4 +206,5 @@ func (bt *Wmibeat) Cleanup(b *beat.Beat) error {
 
 func (bt *Wmibeat) Stop() {
 	close(bt.done)
+	bt.events.Close()
 }
