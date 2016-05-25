@@ -16,5 +16,4 @@ type ClassConfig struct {
 	Class       string    `config:"class"`
 	Fields      []string  `config:"fields"`
 	WhereClause string    `config:"whereclause"`
-	ObjectTitle string    `config:"objecttitlecolumn"`
 }
